@@ -5,6 +5,8 @@
 ^release$
 ^dev$
 ^inst/validation$
+^inst/technical$
+^inst/CITATION$
 ^cran-comments[.]md$
 ^[.]git$
 ^[.]gitignore$

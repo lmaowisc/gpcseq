@@ -32,8 +32,7 @@
 #'   probabilities separately. All influences account for the randomness
 #'   in both estimated censoring distributions. The variance is the sum
 #'   of squared patient influences divided by the square of the respective
-#'   arm's enrollment. See `system.file("technical", "pair-influences.md",
-#'   package = "gpcseq")` for the formulas.
+#'   arm's enrollment.
 #'
 #' An undefined transformation is returned with `valid = FALSE`, `NA`
 #' estimates, standard error and influences, and an informative reason;

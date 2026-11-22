@@ -1,5 +1,6 @@
-# All helpers below are private. Package documentation in inst/technical/boundaries.md
-# gives their contracts, integration tolerances, failure policy and reference examples.
+# All helpers below are private. Their contracts, integration tolerances,
+# failure policy and reference examples are documented in the project's
+# internal technical notes.
 
 # history: completed fits with one (id, arm, phi) row per patient; previous: optional
 # (K-1)-square saved covariance. Returns a K-square covariance of estimates.

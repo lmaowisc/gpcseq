@@ -21,6 +21,8 @@ dev/
 reviews/
 release/
 inst/validation/
+inst/technical/
+inst/CITATION
 checks-*/
 driver.log
 launcher.log
