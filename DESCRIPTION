@@ -1,0 +1,25 @@
+Package: gpcseq
+Type: Package
+Title: Group Sequential Analysis of Pairwise Treatment Effects
+Version: 0.4.0
+Authors@R: person("Lu", "Mao", email = "lmao@biostat.wisc.edu",
+    role = c("aut", "cre"), comment = c(ORCID = "0000-0002-8626-9822"))
+Description: Estimate and monitor pairwise treatment effects when clinical
+    histories continue to accrue between interim analyses. Implements
+    survival-prioritized shared-window comparisons, censoring-weighted
+    restricted win-loss statistics, and restricted net win time estimated
+    from multistate occupation probabilities. Subject-level influences give
+    cross-look covariance and stopping boundaries for calendar-time spending.
+License: GPL-3
+URL: https://github.com/lmaowisc/gpcseq
+BugReports: https://github.com/lmaowisc/gpcseq/issues
+Contact: Lu Mao <lmao@biostat.wisc.edu>
+Encoding: UTF-8
+Depends: R (>= 4.1.0)
+Imports: stats, utils, mvtnorm
+Suggests: testthat (>= 3.0.0), knitr, rmarkdown
+VignetteBuilder: knitr
+Config/testthat/edition: 3
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.2
+NeedsCompilation: yes

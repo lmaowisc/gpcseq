@@ -1,0 +1,155 @@
+---
+title: "From a pairwise comparison to a patient influence"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{From a pairwise comparison to a patient influence}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+library(gpcseq)
+```
+
+At one look, a patient's influence measures how the estimate changes if that patient receives slightly more weight. Patients, not pairs, are the independent observations within each arm. For an arm of size $n_a$ the contribution to the estimated variance is the sum of its squared patient influences divided by $n_a^2$. We use this identity to check the three estimators below.
+
+## Shared-window test: take row and column means
+
+At the final data cut of the four-patient trial, the signed scores are
+
+```{r}
+d <- gpc_example(2)
+J <- matrix(c(1, 1, 1, -1), 2, byrow = TRUE,
+            dimnames = list(c("T1", "T2"), c("C1", "C2")))
+J
+phi <- c(rowMeans(J), colMeans(J)) - mean(J)
+trial <- gpc_design(2, .05, "shared")
+trial <- gpc_update(trial, d$patients, d$events)
+gpc_influence(trial)
+stopifnot(all.equal(as.numeric(gpc_covariance(trial)), sum(phi^2)/4))
+```
+
+The two rows average to 1 and 0. Subtracting the overall mean of 0.5 gives treatment influences of 0.5 and −0.5. The column means give the same two influences in control. With two patients in each arm, the estimated variance is 0.25. This test concerns the win–loss curve; the score's expectation also depends on the shared follow-up windows.
+
+## Restricted win–loss: include the fitted weights
+
+Here three patients enter each arm at calendar time 0. The horizon is 2. Patient T3 drops out at 0.8; C1 dies at 1; T2 dies at 1.4. Only C2 has a recorded admission. This construction separates a clinical tie from an unascertained pair.
+
+```{r}
+p <- data.frame(id = c("T1","T2","T3","C1","C2","C3"),
+                arm = rep(c(1,0), each = 3), entry = 0,
+                followup = c(2,1.4,.8,1,2,2),
+                death = c(FALSE,TRUE,FALSE,TRUE,FALSE,FALSE))
+e <- data.frame(id = "C2", time = .4, type = "hospitalization")
+ipcw <- function(effect) {
+  plan <- gpc_design(2, .05, "ipcw", effect = effect, horizons = 2)
+  gpc_update(plan, p, e)
+}
+benefit <- ipcw("net_benefit")
+```
+
+Before the horizon there is one censoring event, with three patients at risk in treatment. Hence treatment censoring survival is $2/3$ after 0.8 and control censoring survival is 1. The observed first death or the horizon settles each qualifying score. T3's pairs are unascertained and contribute zero to both counts. T1 and C3 are observed through the horizon and tie. In treatment-by-control order, the weighted signed matrix is
+
+```{r}
+Q <- 1.5 * matrix(c(1,1,0, 1,-1,-1, 0,0,0), 3, byrow = TRUE,
+                  dimnames = list(p$id[1:3], p$id[4:6]))
+Q
+known_weights <- c(rowMeans(Q), colMeans(Q)) - mean(Q)
+```
+
+Dividing by all nine pairs gives net benefit $1/6$. The calculation above holds the censoring weights fixed. To see what remains, consider the treatment censoring jump of $1/3$. The three subjects' censoring event indicators at 0.8 are $(0,0,1)$. Subtract the fitted jump from each indicator, then divide their negatives by $1-1/3$: the relative influences on censoring survival are $(1/2,1/2,-1)$. The control curve has no jump before any score is settled. Because all nonzero scores are settled after 0.8, the contribution from estimating inverse survival is **minus** the mean signed score times these relative influences.
+
+```{r}
+weight_term <- -mean(Q) * c(.5,.5,-1,0,0,0)
+phi <- known_weights + weight_term
+from_fit <- gpc_influence(benefit)
+out <- data.frame(id = p$id, fixed_weights = unname(known_weights),
+                  estimated_weights = weight_term, total = unname(phi),
+                  from_fit = from_fit$phi[match(p$id, from_fit$id)])
+out
+stopifnot(max(abs(out$total - out$from_fit)) < 1e-9,
+          abs(as.numeric(gpc_covariance(benefit)) - 55/216) < 1e-9)
+```
+
+Both win odds and win ratio are tested on the log scale. For log win odds multiply the net-benefit influences by $2/(1-\widehat\theta^2)$. For the log win ratio apply the IPCW calculation to the win and loss indicators **separately**, including the censoring influence for each. The win and loss estimates are $1/2$ and $1/3$; thus win odds is $7/5$ and win ratio is $3/2$. Their difference reflects the tie.
+
+```{r}
+odds <- ipcw("win_odds")
+ratio <- ipcw("win_ratio")
+Qw <- pmax(Q, 0); Ql <- pmax(-Q, 0)
+component <- function(M) {
+  c(rowMeans(M), colMeans(M)) - mean(M) - mean(M) * c(.5,.5,-1,0,0,0)
+}
+odds_if <- 2 * phi / (1 - mean(Q)^2)
+win_if <- component(Qw); loss_if <- component(Ql)
+ratio_if <- win_if/mean(Qw) - loss_if/mean(Ql)
+ordered_if <- function(fit) {
+  i <- gpc_influence(fit)
+  i$phi[match(p$id, i$id)]
+}
+stopifnot(max(abs(ordered_if(odds) - odds_if)) < 1e-9,
+          max(abs(ordered_if(ratio) - ratio_if)) < 1e-9,
+          abs(as.numeric(gpc_covariance(ratio)) - 29/18) < 1e-9)
+data.frame(id = p$id, win = unname(win_if), loss = unname(loss_if),
+           log_win_ratio = unname(ratio_if))
+```
+
+To report all three restricted effects at this cut, use one descriptive fit. It reuses the censoring estimates and pair comparisons. `estimate` and `se` are on the test scale (logarithmic for the ratios); `natural` gives the reported effect on its original scale. The patient IDs in `influences` identify which contributions form its variance.
+
+```{r}
+plan <- gpc_design(2, .05, "ipcw", horizons = 2)
+all_effects <- gpc_ipcw_effects(plan, look = 1, patients = p, events = e)
+all_effects$summary[, c("effect","estimate","natural","se","valid","reason")]
+i <- all_effects$influences
+i[, c("id","arm","net_benefit","win_odds","win_ratio")]
+s <- all_effects$summary
+by_effect <- match(c("net_benefit","win_odds","win_ratio"), s$effect)
+stopifnot(all(s$valid[by_effect]),
+          max(abs(s$natural[by_effect] - c(1/6,7/5,3/2))) < 1e-9,
+          max(abs(i$win_ratio - ratio_if[match(i$id,p$id)])) < 1e-9)
+```
+
+This call spends no error and does not change the monitoring object. If only a ratio is undefined, its row gives the reason while computable effects remain available. The trial still monitors the one contrast specified in its design.
+
+Calculating the log ratio patient by patient preserves the covariance between wins and losses. Taking the variance of the win estimate and loss estimate separately and ignoring this covariance would give an incorrect standard error.
+
+## Restricted net win time: integrate state contrasts
+
+Return to the four complete histories. AJ state probabilities here are empirical proportions. Across intervals delimited by an admission or a death, the instantaneous net advantages are 0, 0.5, 1 and 0.25. The integrated net win time is 0.875.
+
+```{r}
+cuts <- c(0, .5, 1, 1.5, 2)
+sum(diff(cuts) * c(0, .5, 1, .25))
+aj <- gpc_design(2, .05, "aj", effect = "net_win_time", horizons = 2,
+                 state_order = c("well","hospitalized","dead"),
+                 absorbing = "dead", death_state = "dead")
+aj <- gpc_update(aj, d$patients, transitions = d$transitions)
+```
+
+With complete follow-up we can obtain an independent check by integrating each pair's state contrast. T2 and C1 tie until C1 dies at 1; T2 then wins for half a unit, then the two tie after T2 dies. The other pairs are calculated the same way. Centering the row and column means of the four pairwise areas gives the patient influences. This shortcut relies on complete observation. Under censoring the package differentiates the AJ transition updates in each arm and integrates the resulting occupation influences against the opposite arm's probabilities.
+
+```{r}
+area <- matrix(c(1,1.5,.5,.5), 2, byrow = TRUE, dimnames = dimnames(J))
+hand <- c(rowMeans(area), colMeans(area)) - mean(area)
+estimated <- gpc_influence(aj)
+stopifnot(max(abs(estimated$phi - hand[estimated$id])) < 1e-9,
+          abs(as.numeric(gpc_covariance(aj)) - 5/64) < 1e-9)
+estimated
+```
+
+At two looks, use the same patient's two stored influences in place of the square, and divide by that arm's two enrollment counts. The monitoring tutorial applies this calculation to the final boundary.
+
+## Which states contribute to net win time?
+
+To examine the fitted state probabilities, keep the occupation curves at the look of interest. In this example, `times` measures follow-up since each patient's entry. At a transition time the returned probabilities include that transition. A change exactly at the horizon affects the reported state probabilities there and contributes zero duration to net win time.
+
+```{r occupation}
+records <- gpc_example(2)
+states <- c("well", "hospitalized", "dead")
+plan <- gpc_design(2, .05, "aj", horizons = 2, state_order = states,
+                   absorbing = "dead", death_state = "dead")
+aj_fit <- gpc_fit(plan, 1, records$patients, transitions = records$transitions,
+                  keep_occupation = TRUE)
+gpc_occupation(aj_fit, times = c(0, 1, 2))
+```

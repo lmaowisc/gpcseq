@@ -1,0 +1,16 @@
+citHeader("To cite gpcseq in publications, please use:")
+
+bibentry(
+  bibtype = "Unpublished",
+  title   = "Group sequential analysis of pairwise treatment effects under continuing follow-up",
+  author  = c(person("Lu", "Mao"), person("KyungMann", "Kim")),
+  year    = "2026",
+  note    = "Submitted to Biometrics",
+  textVersion = paste(
+    "Mao, L. and Kim, K. (2026).",
+    "Group sequential analysis of pairwise treatment effects under continuing follow-up.",
+    "Submitted to Biometrics."
+  )
+)
+
+citFooter("Update this entry with the journal reference once the article is accepted.")

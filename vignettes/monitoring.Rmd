@@ -1,0 +1,130 @@
+---
+title: "Choosing a horizon and spending the remaining error"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Choosing a horizon and spending the remaining error}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+library(gpcseq)
+```
+
+**Start with the question that would justify stopping.** For equality of the survival-prioritized win and loss curves, select the shared-window test. To estimate benefit through a common follow-up time, use restricted win–loss by IPCW or, for time spent in a more favorable state, restricted net win time by AJ. Each design monitors one chosen effect. The probability guarantees for separate designs do not apply to stopping the first time any one of them rejects.
+
+## An opportunity to reach the horizon is not observed follow-up
+
+At calendar time 10, control patients entered at 1 and 3; treatment patients entered at 0 and 2. With a 50% maturity requirement, one patient per arm is enough: the longest arm-specific opportunities are 9 and 10, so the common horizon is 9. But the earliest control dropped out after three time units. The other control has only seven units of opportunity. No control can support the nine-unit IPCW estimate.
+
+```{r}
+cohort <- data.frame(id = c("C1","C2","T1","T2","T3","T4","T5"),
+                     arm = c(0,0,1,1,1,1,1), entry = c(1,3,0,2,11,11,12),
+                     dropout = c(3,Inf,Inf,Inf,Inf,Inf,Inf))
+snapshot <- function(u) {
+  p <- cohort[cohort$entry <= u, ]
+  p$followup <- pmin(u - p$entry, p$dropout)
+  p$death <- FALSE
+  p
+}
+e <- data.frame(id = "C2", time = .4, type = "hospitalization")
+trial <- gpc_design(c(10,12), c(.01,.05), method = "ipcw",
+                    maturity = list(p = .5, cap = 24))
+trial <- gpc_update(trial, snapshot(10), e)
+trial <- gpc_update(trial, snapshot(12), e)
+gpc_results(trial)[, c("look","n0","n1","horizon","spent","action","reason")]
+```
+
+At time 12, treatment opportunities are 12, 10, 1, 1 and 0. At least three of five must reach the horizon, so this arm supplies a horizon of 1; the new common horizon is 1. It has shortened despite two more units of calendar time. The rule uses entry dates before inspecting clinical scores. Deferral at the first look leaves all the planned error for the final look. Frequent deferrals warrant assessment in design simulations; theory for the nominal error presumes their probability tends to zero.
+
+## An upper-only interim and a two-sided final
+
+All six patients in this example enter at time 0 and survive through 2. The comparison favors fewer admissions; patients with the same count tie. Before the first scheduled look at 0.1, there are no admissions: every pair ties and the test is deferred. One subject in each arm is admitted at 0.5 and another at 1.5. The distributions in the arms match at both later looks, so neither boundary is crossed.
+
+```{r}
+ids <- c("C1","C2","C3","T1","T2","T3")
+p <- data.frame(id = ids, arm = rep(0:1, each = 3), entry = 0,
+                followup = 0, death = FALSE)
+admissions <- data.frame(id = c("C1","T1","C2","T2"),
+                         time = c(.5,.5,1.5,1.5), type = "hospitalization")
+looks <- c(.1,1,2)
+mon <- gpc_design(looks, c(.003,.01,.05), method = "shared",
+                  hierarchy = gpc_hierarchy(admission_time = "none"),
+                  direction = "upper-final-two-sided")
+for (u in looks) {
+  p$followup <- u
+  mon <- gpc_update(mon, p, admissions[admissions$time <= u, ])
+}
+gpc_results(mon)[, c("look","alpha","spent","direction","critical","z","action")]
+V <- gpc_covariance(mon)
+V
+cov2cor(V)
+```
+
+The first performed test is at scheduled look 2. It remains upper-only and spends 0.01, so its critical value is 2.32635. The covariance of the two estimates is $2/27$ and each variance is $4/27$. Hence the two test statistics have correlation 0.5. For the two-sided final at scheduled look 3, the probability of reaching that look and crossing either boundary is $0.05-0.01=0.04$. It is an unconditional probability. The corresponding final boundary is about 2.03222. The skipped look contributes no coordinate to the correlation matrix.
+
+```{r}
+stopifnot(max(abs(unname(V) - matrix(c(4,2,2,4), 2)/27)) < 1e-9,
+          abs(tail(gpc_results(mon)$critical, 1) - 2.0322231) < 1e-5)
+```
+
+The hybrid rule assigns 0.05 to rejection in either direction over the entire trial. Because early rejection is allowed only for treatment benefit, each direction need not receive 0.025. If the final look is unusable, the trial ends without rejection unless it has already stopped; no make-up analysis is automatically added.
+
+## Check the stopping rule before choosing the design
+
+A protocol specifies when to look and how much error to spend. To assess its operating characteristics, generate each patient's full history once, then reveal the records available at each scheduled look. Count a trial as a rejection if it crosses at any look. Include trials with deferred looks in the denominator.
+
+Suppose 100 patients are allocated equally to two arms. Both arms have the same survival distribution. A three-level baseline grade is independent of survival and has different symmetric distributions in the two arms. The probabilities of winning and losing are therefore equal at every horizon, even though the grade distributions differ. Accrual is uniform over three time units, and independent dropout is more frequent in the treatment arm. Survival has priority over grade, and lower grades are favorable.
+
+```{r generate-null-trial}
+simulate_patients <- function(n) {
+  stopifnot(n >= 4, n %% 2 == 0)
+  arm <- rep(0:1, each = n / 2)
+  grade <- c(sample.int(3, n / 2, TRUE, prob = c(.25, .50, .25)),
+             sample.int(3, n / 2, TRUE, prob = c(.40, .20, .40)))
+  data.frame(id = sprintf("P%06d", seq_len(n)), arm = arm, grade = grade,
+             entry = runif(n, 0, 3), death_time = rexp(n, .20),
+             dropout = rexp(n, ifelse(arm == 0, .10, .18)))
+}
+
+monitor_trial <- function(plan, full) {
+  for (u in plan$design$looks) {
+    p <- full[full$entry <= u, ]
+    p$followup <- pmin(p$death_time, p$dropout, u - p$entry)
+    p$death <- p$death_time <= p$followup
+    grades <- data.frame(id = p$id, time = rep(0, nrow(p)),
+                         type = rep("biomarker", nrow(p)), value = p$grade)
+    plan <- gpc_update(plan, p[, c("id", "arm", "entry", "followup", "death")], grades)
+    if (plan$closed) break
+  }
+  gpc_results(plan)
+}
+```
+
+Use a two-sided IPCW net-benefit test with cumulative spending of 0.005, 0.02 and 0.05. At least a quarter of each arm must have had the opportunity to reach the selected horizon, and three patients per arm must still be observed at that time. These are eligibility conditions for performing the test. Its normal approximation can still be poor when a small number of patients determine its standard error.
+
+```{r design-null-trial}
+plan <- gpc_design(c(2, 4, 6), spending = c(.005, .02, .05),
+                   method = "ipcw", effect = "net_benefit",
+                   hierarchy = gpc_hierarchy(admission_count = FALSE,
+                       admission_time = "none", biomarker_margin = 0),
+                   maturity = list(p = .25, cap = 2.25),
+                   min_enrolled = 3, min_risk = 3)
+set.seed(281001)
+monitor_trial(plan, simulate_patients(100))[, c("look", "horizon", "se", "action")]
+```
+
+Repeat the entire trial under independent seeds. Choose the number of replicates for the Monte Carlo precision needed. Under this particular design, 809 of 10,000 trials rejected at one of the three looks, or 8.09% (exact 95% Monte Carlo interval 7.56% to 8.64%), against the planned 5%. The first rejection occurred at look 1 in 256 trials, at look 2 in 236 and at the final look in 317. At the first look, 451 trials had too few patients at risk to test. To evaluate a proposed protocol, change the sample size, calendar looks, support rules and data generator to reflect that trial.
+
+```{r repeat-null-trials, eval=FALSE}
+seeds <- 501000L + seq_len(10000L)
+first_rejection <- vapply(seeds, function(seed) {
+  set.seed(seed)
+  log <- monitor_trial(plan, simulate_patients(100))
+  crossed <- log$action %in% c("reject_upper", "reject_lower")
+  if (any(crossed)) log$look[which(crossed)[1L]] else 0L
+}, integer(1))
+table(factor(first_rejection, levels = 0:3))  # 0 denotes no rejection
+binom.test(sum(first_rejection > 0L), length(seeds))$conf.int
+```

@@ -1,0 +1,10 @@
+^gpcseq[.]Rproj$
+^[.]Rproj[.]user$
+^DEVELOPMENT[.]md$
+^reviews$
+^release$
+^dev$
+^inst/validation$
+^cran-comments[.]md$
+^[.]git$
+^[.]gitignore$

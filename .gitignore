@@ -1,0 +1,27 @@
+.Rproj.user/
+.Rhistory
+.RData
+.Ruserdata
+.DS_Store
+*.Rcheck/
+gpcseq_*.tar.gz
+gpcseq_*.zip
+*.Rout
+*.Rout.fail
+*.o
+*.so
+*.dll
+*.dylib
+*.bundle
+# Internal development material kept out of the public repository
+gpcseq.Rproj
+DEVELOPMENT.md
+cran-comments.md
+dev/
+reviews/
+release/
+inst/validation/
+checks-*/
+driver.log
+launcher.log
+run-check.command

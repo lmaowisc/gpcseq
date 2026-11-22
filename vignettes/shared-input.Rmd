@@ -1,0 +1,100 @@
+---
+title: "Preparing trial histories and choosing an endpoint hierarchy"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Preparing trial histories and choosing an endpoint hierarchy}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+library(gpcseq)
+```
+
+## Choose what settles a comparison
+
+Suppose a treated patient has one stroke but can walk 450 metres at follow-up; a control patient has no stroke but can walk only 300 metres. Both are alive at time 2. Which patient wins depends on the clinical question. If avoiding stroke has priority, control wins. If walking more than 400 metres has priority, treatment wins.
+
+The patient records are the same for either question. Name the outcome channels when assembling the cut; then name each channel again in the endpoint that uses it. Here admissions and pain scores are available alongside strokes and walking distances. A channel need not enter every rule.
+
+```{r named-clinical-histories}
+patients <- data.frame(id = c("T", "C"), arm = 1:0, entry = 0,
+                       followup = 2, death = FALSE)
+stroke <- data.frame(id = "T", time = 0.75)
+admission <- data.frame(id = "C", time = 1)
+walk <- data.frame(id = c("T", "C"), time = 1.5, value = c(450, 300))
+pain <- data.frame(id = c("T", "C"), time = 1.5, value = c(2, 4))
+multi <- gpc_trial_data(patients, events = list(stroke = stroke, admission = admission),
+                        measurements = list(walk = walk, pain = pain))
+```
+
+A list of endpoints specifies their order **after survival**. The first endpoint that separates the two patients decides the comparison. A walking distance exactly equal to 400 is in the at-or-below group. Reversing the priority requires no change to `multi`.
+
+```{r order-changes-winner}
+stroke_count <- gpc_endpoint("stroke", "count")
+can_walk <- gpc_endpoint("walk", "value", direction = "higher", threshold = 400)
+stroke_first <- gpc_hierarchy(endpoints = list(stroke = stroke_count, mobility = can_walk))
+mobility_first <- gpc_hierarchy(endpoints = list(mobility = can_walk, stroke = stroke_count))
+
+score <- function(rule) {
+  plan <- gpc_design(looks = 2, spending = .05, method = "shared", hierarchy = rule)
+  gpc_fit(plan, look = 1, data = multi)$estimate
+}
+scores <- c(stroke_first = score(stroke_first), mobility_first = score(mobility_first))
+scores
+```
+
+These are scores for one pair, not two tests to run in the same trial. Prespecify one hierarchy before reviewing treatment comparisons. Death settles the comparison at the first death under either hierarchy; the nonfatal endpoints are considered only if both patients are alive. When a prespecified comparison needs a custom function, apply the same clinical rule to each patient's history through the supplied cutoff. Exchanging the patients must exchange wins and losses. Do not use treatment labels, future observations or a fitted trial-level estimate to decide which patient wins.
+
+For the usual admission-and-biomarker comparison below, explicitly select the admission or biomarker channel if several are available. With named endpoints, each endpoint already identifies its channel.
+
+## Start with the patients and their records
+
+At calendar time 2, a trial has the following observed histories. All four patients entered at time 0. For T2 and C1, follow-up ended at death; T1 and C2 were alive and under observation through time 2. C2 was admitted at 0.5. The patient table records treatment and follow-up. The admission table records the time of each admission since entry.
+
+```{r}
+d <- gpc_example(2)
+subjects <- d$patients
+admissions <- d$events[, c("id", "time"), drop = FALSE]
+subjects[, c("id", "arm", "entry", "followup", "death")]
+admissions
+```
+
+Keep the patient ID on every history table. Column names on the subject table can be mapped when constructing the cut. Here the event channel is named `"admission"`. The default comparison favors longer survival, then fewer admissions, then a later **last** admission among patients tied on the count. Two patients with no admissions tie on timing. No biomarker channel is needed in this example.
+
+```{r}
+cut <- gpc_trial_data(subjects = subjects, id = "id", followup = "followup",
+                      death = "death", treatment = "arm", entry = "entry",
+                      events = list(admission = admissions), event = "admission",
+                      state0 = "state0", transitions = d$transitions)
+```
+
+This is **one frozen calendar cut**. At an earlier look, use the follow-up and events actually known at that earlier date. An occurrence date is not necessarily a reporting date. Omitting an unreported admission does not establish an admission-free history. For example, `gpc_example(1)` is a separate cut: T2 is still known to be alive at time 1.
+
+## Fit and monitor the prespecified comparison
+
+Use the prepared histories to estimate net benefit through time 2. `gpc_fit()` gives the estimate and patient contributions; `gpc_update()` applies the stopping rule.
+
+```{r}
+plan <- gpc_design(looks = 2, spending = .05, method = "ipcw", horizons = 2)
+fit <- gpc_fit(plan, look = 1, data = cut)            # Estimate at this look
+fit$estimate
+gpc_influence(fit)
+
+effects <- gpc_ipcw_effects(plan, look = 1, data = cut) # Three descriptive effects
+effects$summary[, c("effect", "natural", "se", "valid")]
+trial <- gpc_update(plan, data = cut)                    # Perform the prespecified test
+gpc_results(trial)[, c("look", "horizon", "estimate", "se", "action")]
+```
+
+Through time 2 the treated patient wins in three of the four pairs. Net benefit is 0.5; win odds and win ratio both equal 3. The descriptive call computes all three from one censoring fit. Only the effect chosen in the trial design determines the stopping decision. In the example, calendar time 2 is the **first and only scheduled look**, hence `look = 1`.
+
+The state-based analysis uses the same patients but requires more than admission times: what states mean, their clinical order, and where each transition leads. Here `hospitalized` means *has had an admission*, not *is currently in hospital*. Death is absorbing. For current hospital occupancy one would also need discharge times. Named measurement channels alone do not supply these state semantics.
+
+```{r}
+aj <- gpc_design(2, .05, "aj", horizons = 2,
+                 state_order = c("well", "hospitalized", "dead"),
+                 absorbing = "dead", death_state = "dead")
+gpc_fit(aj, look = 1, data = cut)$natural           # 0.875 time units
+```
