@@ -18,6 +18,8 @@ export(gpc_transport_outcome)
 export(gpc_trial_data)
 export(gpc_update)
 importFrom(stats,setNames)
-importFrom(utils,head)
-importFrom(utils,tail)
+importFrom(utils,
+  head,
+  tail
+)
 useDynLib(gpcseq, .registration = TRUE)

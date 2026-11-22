@@ -7,21 +7,21 @@
 \format{
 A data frame with 500 rows and 5 variables:
 \describe{
-  \item{id}{Patient identifier.}
-  \item{arm}{Randomized arm: 1 for active treatment, 0 for placebo.}
-  \item{entry}{Calendar month of entry, between 0 and 66.}
-  \item{death_time}{Months from entry to death; \code{NA} if the
-    patient was alive at the end of the study.}
-  \item{hosp_time}{Months from entry to the first hospitalization;
-    \code{NA} if none was observed before death or the end of the
-    study.}
+\item{id}{Patient identifier.}
+\item{arm}{Randomized arm: 1 for active treatment, 0 for placebo.}
+\item{entry}{Calendar month of entry, between 0 and 66.}
+\item{death_time}{Months from entry to death; \code{NA} if the
+patient was alive at the end of the study.}
+\item{hosp_time}{Months from entry to the first hospitalization;
+\code{NA} if none was observed before death or the end of the
+study.}
 }
 }
 \source{
 Simulated. No real patient data.
 }
 \usage{
-topcat_mock
+data(topcat_mock)
 }
 \description{
 A simulated dataset patterned after the TOPCAT trial in heart failure:
