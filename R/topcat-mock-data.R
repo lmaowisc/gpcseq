@@ -1,0 +1,23 @@
+#' Mock monitoring data for a heart-failure trial
+#'
+#' A simulated dataset patterned after the TOPCAT trial in heart failure:
+#' 500 patients randomized 1:1 to active treatment or placebo, enrolled
+#' over 66 months, with all-cause death prioritized over first
+#' hospitalization. Event times are months from the patient's own entry,
+#' as recorded in the final study database at calendar month 84. The
+#' README monitors this trial at calendar months 18, 36, 54, 72 and 84
+#' with the shared-window win--loss test.
+#'
+#' @format A data frame with 500 rows and 5 variables:
+#' \describe{
+#'   \item{id}{Patient identifier.}
+#'   \item{arm}{Randomized arm: 1 for active treatment, 0 for placebo.}
+#'   \item{entry}{Calendar month of entry, between 0 and 66.}
+#'   \item{death_time}{Months from entry to death; \code{NA} if the
+#'     patient was alive at the end of the study.}
+#'   \item{hosp_time}{Months from entry to the first hospitalization;
+#'     \code{NA} if none was observed before death or the end of the
+#'     study.}
+#' }
+#' @source Simulated. No real patient data.
+"topcat_mock"
