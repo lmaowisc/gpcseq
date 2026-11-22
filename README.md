@@ -25,26 +25,33 @@ deferred interim look and a two-sided final analysis, open
 
 The analyst supplies the calendar times in `looks`, including the final analysis. For example, `looks = c(12, 24, 36)` specifies two interim looks and a final analysis at month 36. By default the trial uses O’Brien–Fleming-like spending at a two-sided level of 0.05. The other named choices are Pocock-like (`"pocock"`), Kim–DeMets (`"power"`), and Hwang–Shih–DeCani (`"hsd"`). Alternatively, `spending = c(.005, .02, .05)` specifies the cumulative alpha at those three looks directly.
 
-The package ships a four-patient data cut for illustration: `gpc_example(k)`
-returns the records available at look `k` (see `?gpc_example` for the full
-histories and hand-calculable answers). Two treated patients (T1, alive with no
-admissions throughout; T2, who dies at time 1.5) face two controls (C1, who
-dies at time 1; C2, admitted at time 0.5 and alive thereafter). All four enter
-at time 0, and the two looks fall at times 1 and 2. The shared-window test
-compares each pair over its available follow-up: survival first, then fewer
-admissions, then a later last admission if counts tie.
+In this four-patient example we use two looks, at times 1 and 2. All four
+patients enter at calendar time 0: treated patient T1 stays alive with no
+admissions, treated patient T2 dies at time 1.5, control C1 dies at time 1,
+and control C2 is admitted at time 0.5 and remains alive. The shared-window
+test compares each pair over its available follow-up: survival first, then
+fewer admissions, then a later last admission if counts tie.
 
 ```r
 library(gpcseq)
-trial <- gpc_design(looks = c(1, 2), method = "shared")
 
+death  <- c(T1 = Inf, T2 = 1.5, C1 = 1, C2 = Inf)    # Times of death
+events <- data.frame(id = "C2", time = 0.5, type = "hospitalization")
+snapshot <- function(u)                   # Records known by calendar time u
+  data.frame(id = names(death), arm = c(1, 1, 0, 0), entry = 0,
+             followup = unname(pmin(u, death)), death = unname(death <= u))
+
+trial <- gpc_design(looks = c(1, 2), method = "shared")
 for (k in 1:2) {
-  cut <- gpc_example(k)                                # Records available at this look
-  trial <- gpc_update(trial, cut$patients, cut$events)
+  trial <- gpc_update(trial, snapshot(k), events)
   if (!tail(gpc_results(trial)$action, 1) %in% c("continue", "deferred")) break
 }
 gpc_results(trial)[, c("look", "estimate", "se", "z", "critical", "spent", "action")]
 ```
+
+The same data cut, including the state transitions used by the
+Aalen--Johansen method, ships as `gpc_example()`; its help page
+(`?gpc_example`) gives hand-calculable answers for all three methods.
 
 At look 1, treatment wins all four comparisons. With no variation in the scores, the test is deferred and spends no error. At look 2, one treatment patient has died, reversing one comparison. Three wins and one loss give a mean score of 0.5 and a standard error of 0.5. The test statistic is 1, below the final boundary of 1.96; the trial ends without rejection.
 
