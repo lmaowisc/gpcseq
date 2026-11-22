@@ -1,9 +1,7 @@
 # gpcseq 0.4.0
 
-* Added `topcat_mock`, a simulated monitoring dataset patterned after
-  the TOPCAT heart-failure trial. The README now walks through its
-  five-look analysis one data cut at a time, showing each boundary and
-  decision, with the path pinned by a regression test.
+* Added `topcat_mock`, a simulated heart-failure monitoring dataset;
+  its five-look analysis is pinned by a regression test.
 * Boundary calibration now budgets the trivariate backend's effective
   tolerance floor (1e-14 per inclusion-exclusion corner), so a request
   tighter than the backend can honor defers the look instead of

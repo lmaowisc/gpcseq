@@ -29,7 +29,7 @@ A simulated dataset patterned after the TOPCAT trial in heart failure:
 over 66 months, with all-cause death prioritized over first
 hospitalization. Event times are months from the patient's own entry,
 as recorded in the final study database at calendar month 84. The
-README monitors this trial at calendar months 18, 36, 54, 72 and 84
-with the shared-window win--loss test.
+package tests monitor this trial at calendar months 18, 36, 54, 72
+and 84 with the shared-window win--loss test, stopping at month 72.
 }
 \keyword{datasets}
