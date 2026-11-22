@@ -25,7 +25,14 @@ deferred interim look and a two-sided final analysis, open
 
 The analyst supplies the calendar times in `looks`, including the final analysis. For example, `looks = c(12, 24, 36)` specifies two interim looks and a final analysis at month 36. By default the trial uses O’Brien–Fleming-like spending at a two-sided level of 0.05. The other named choices are Pocock-like (`"pocock"`), Kim–DeMets (`"power"`), and Hwang–Shih–DeCani (`"hsd"`). Alternatively, `spending = c(.005, .02, .05)` specifies the cumulative alpha at those three looks directly.
 
-In this four-patient example we use two looks. The shared-window test compares each pair over its available follow-up. Survival comes first, then fewer admissions, then a later last admission if counts tie.
+The package ships a four-patient data cut for illustration: `gpc_example(k)`
+returns the records available at look `k` (see `?gpc_example` for the full
+histories and hand-calculable answers). Two treated patients (T1, alive with no
+admissions throughout; T2, who dies at time 1.5) face two controls (C1, who
+dies at time 1; C2, admitted at time 0.5 and alive thereafter). All four enter
+at time 0, and the two looks fall at times 1 and 2. The shared-window test
+compares each pair over its available follow-up: survival first, then fewer
+admissions, then a later last admission if counts tie.
 
 ```r
 library(gpcseq)
