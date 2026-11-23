@@ -22,36 +22,39 @@ deferred interim look and a two-sided final analysis, open
 
 The analyst supplies the calendar times in `looks`, including the final analysis. For example, `looks = c(12, 24, 36)` specifies two interim looks and a final analysis at month 36. By default the trial uses O’Brien–Fleming-like spending at a two-sided level of 0.05. The other named choices are Pocock-like (`"pocock"`), Kim–DeMets (`"power"`), and Hwang–Shih–DeCani (`"hsd"`). Alternatively, `spending = c(.005, .02, .05)` specifies the cumulative alpha at those three looks directly.
 
-In this four-patient example we use two looks, at times 1 and 2. All
-four patients enter at time 0: treated patient T1 stays alive with no
-admissions, treated patient T2 dies at time 1.5, control C1 dies at
-time 1, and control C2 is admitted at time 0.5 and remains alive. The
-shared-window test compares each pair over its shared follow-up:
-survival first, then fewer admissions, then a later last admission if
-counts tie. Each look passes the patient records known by that time --
-follow-up so far and death status -- plus the event table.
+In this four-patient example we schedule two looks, at times 1 and 2.
+The shared-window test compares each treated--control pair over its
+shared follow-up: survival first, then fewer admissions, then a later
+last admission if counts tie. Each look passes the patient records
+known by that time, plus the events observed so far.
 
 ```r
-library(gpcseq)
+library(gpcseq)                              # Load the package
 
-events <- data.frame(id = "C2", time = 0.5, type = "hospitalization")
+events <- data.frame(id = "C2", time = 0.5,  # C2 is hospitalized at time 0.5
+                     type = "hospitalization")
 
-look1 <- data.frame(id       = c("T1", "T2", "C1", "C2"),
-                    arm      = c(1, 1, 0, 0),
-                    entry    = 0,
-                    followup = c(1, 1, 1, 1),
-                    death    = c(FALSE, FALSE, TRUE, FALSE))
+look1 <- data.frame(                         # Records known at calendar time 1
+  id       = c("T1", "T2", "C1", "C2"),      # Two treated, two control patients
+  arm      = c(1, 1, 0, 0),                  # 1 = treatment, 0 = control
+  entry    = 0,                              # All enter at trial opening
+  followup = c(1, 1, 1, 1),                  # Each observed through time 1
+  death    = c(FALSE, FALSE, TRUE, FALSE))   # C1 has died, at time 1
 
-look2 <- data.frame(id       = c("T1", "T2", "C1", "C2"),
-                    arm      = c(1, 1, 0, 0),
-                    entry    = 0,
-                    followup = c(2, 1.5, 1, 2),
-                    death    = c(FALSE, TRUE, TRUE, FALSE))
+look2 <- data.frame(                         # Records known at calendar time 2
+  id       = c("T1", "T2", "C1", "C2"),      # Same four patients
+  arm      = c(1, 1, 0, 0),
+  entry    = 0,
+  followup = c(2, 1.5, 1, 2),                # Follow-up ends at death or at 2
+  death    = c(FALSE, TRUE, TRUE, FALSE))    # T2 has now died, at time 1.5
 
-trial <- gpc_design(looks = c(1, 2), method = "shared")
-trial <- gpc_update(trial, look1, events)
-trial <- gpc_update(trial, look2, events)
-gpc_results(trial)[, c("look", "estimate", "se", "z", "critical", "spent", "action")]
+trial <- gpc_design(looks = c(1, 2),         # Analyses scheduled at times 1 and 2
+                    method = "shared")       # Shared-window win-loss test
+trial <- gpc_update(trial, look1, events)    # Look 1: treatment wins every pair --
+                                             #   no score variation, test deferred
+trial <- gpc_update(trial, look2, events)    # Look 2: T2's death reverses one pair
+gpc_results(trial)[, c("look", "estimate", "se", "z",   # The monitoring log:
+                       "critical", "spent", "action")]  #   one row per look
 ```
 
 The same data cut, including the state transitions used by the
