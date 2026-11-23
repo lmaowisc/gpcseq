@@ -15,15 +15,8 @@ gpcseq_*.zip
 *.bundle
 # Internal development material kept out of the public repository
 gpcseq.Rproj
-DEVELOPMENT.md
 cran-comments.md
 dev/
-reviews/
-release/
 inst/validation/
 inst/technical/
 inst/CITATION
-checks-*/
-driver.log
-launcher.log
-run-check.command
